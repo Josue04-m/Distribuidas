@@ -1,4 +1,4 @@
-Flask=3.0.3
+Flask==3.0.3
 gunicode==22.0.0
 python-tds==1.15.0
 pyOpenSSL==24.2.1

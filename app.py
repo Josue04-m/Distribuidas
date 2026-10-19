@@ -15,7 +15,7 @@ import pytds
 app  = Flask(__name__)
 def getConnection():
    return pytds.connect(
-      server = os.environ["DB_SEERVER"],
+      server = os.environ["DB_SERVER"],
       database = os.environ["DB_DATABASE"],
       user = os.environ["DB_USER"],
       password = os.environ["DB_PASS"],

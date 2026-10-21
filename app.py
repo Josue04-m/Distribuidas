@@ -70,8 +70,17 @@ def procesar_catalogo():
     ):
         return jsonify({"message": "No autorizado"}), 401
 
-    datos = request.get_json(silent=True) or {}
-    destinatario = datos.get("email", "").strip()
+    datos = request.get_json(silent=True)
+
+    if not isinstance(datos, dict):
+        datos = {}
+
+    destinatario = datos.get("email", "")
+
+    if not isinstance(destinatario, str):
+        destinatario = ""
+
+    destinatario = destinatario.strip()
 
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", destinatario):
         return jsonify({"message": "Ingresa un correo válido"}), 400
@@ -90,28 +99,104 @@ def procesar_catalogo():
         if not productos:
             return jsonify({"message": "No hay productos para enviar"}), 404
 
-        filas_html = ""
+        tarjetas_html = ""
 
         for producto in productos:
             nombre = html.escape(str(producto.name or "Sin nombre"))
-            precio = html.escape(f"{producto.price or 0:.2f}")
-            stock = html.escape(str(producto.stock or 0))
+            precio_valor = producto.price if producto.price is not None else 0
+            precio = html.escape(f"{precio_valor:.2f}")
+            stock_valor = producto.stock if producto.stock is not None else 0
+            stock = html.escape(str(stock_valor))
 
-            filas_html += (
-                f"<tr><td>{nombre}</td>"
-                f"<td>${precio}</td>"
-                f"<td>{stock} unidades</td></tr>"
-            )
+            tarjetas_html += f"""
+                <div style="
+                    background-color:#ffffff;
+                    border:1px solid #eadde0;
+                    border-radius:12px;
+                    padding:18px;
+                    margin:0 0 14px;
+                ">
+                    <div style="
+                        color:#641523;
+                        font-size:18px;
+                        font-weight:bold;
+                        margin-bottom:12px;
+                    ">
+                        {nombre}
+                    </div>
+
+                    <div style="font-size:14px;color:#555555;margin-bottom:6px;">
+                        <strong style="color:#641523;">Precio:</strong>
+                        ${precio}
+                    </div>
+
+                    <div style="font-size:14px;color:#555555;">
+                        <strong style="color:#641523;">Stock:</strong>
+                        {stock} unidades
+                    </div>
+                </div>
+            """
 
         contenido = f"""
-        <h2>Catálogo de productos</h2>
-        <p>Estos son los productos disponibles:</p>
-        <table border="1" cellpadding="8" cellspacing="0">
-            <thead>
-                <tr><th>Producto</th><th>Precio</th><th>Stock</th></tr>
-            </thead>
-            <tbody>{filas_html}</tbody>
-        </table>
+        <div style="
+            margin:0;
+            padding:30px 12px;
+            background-color:#f7f2f3;
+            font-family:Arial,Helvetica,sans-serif;
+            color:#333333;
+        ">
+            <div style="
+                max-width:600px;
+                margin:0 auto;
+                background-color:#ffffff;
+                border-radius:16px;
+                overflow:hidden;
+                border:1px solid #eadde0;
+            ">
+                <div style="
+                    background-color:#641523;
+                    padding:28px 24px;
+                    text-align:center;
+                ">
+                    <h1 style="
+                        color:#ffffff;
+                        font-size:25px;
+                        margin:0;
+                    ">
+                        Catálogo de productos
+                    </h1>
+                    <p style="
+                        color:#f3dfe3;
+                        font-size:14px;
+                        margin:10px 0 0;
+                    ">
+                        Productos disponibles y stock actual
+                    </p>
+                </div>
+
+                <div style="padding:24px;">
+                    <p style="
+                        color:#555555;
+                        font-size:15px;
+                        line-height:1.5;
+                        margin:0 0 20px;
+                    ">
+                        Revisa nuestro catálogo de productos:
+                    </p>
+
+                    {tarjetas_html}
+
+                    <p style="
+                        color:#777777;
+                        font-size:12px;
+                        text-align:center;
+                        margin:22px 0 0;
+                    ">
+                        Gracias por tu interés.
+                    </p>
+                </div>
+            </div>
+        </div>
         """
 
         enviar_correo(

@@ -1,4 +1,7 @@
-
+import html
+import hmac
+import re
+import requests
 
 import time
 import threading
@@ -22,9 +25,115 @@ def getConnection():
       port = 1433,
       cafile= certifi.where(),
       validate_host = True,
-      row_strategy = pytds.namedtuple_row_strategy
+      row_strategy = pytds.namedtuple_row_strategy #Agregar esta linea 
       
       )
+
+def enviar_correo(proceso, detalle, destinatario):
+    api_key = os.environ["BREVO_API_KEY"]
+    remitente = os.environ["EMAIL_REMITENTE"]
+
+    respuesta = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "accept": "application/json",
+            "api-key": api_key,
+            "content-type": "application/json",
+        },
+        json={
+            "sender": {
+                "name": "Catálogo de productos",
+                "email": remitente,
+            },
+            "to": [{"email": destinatario}],
+            "subject": proceso,
+            "htmlContent": detalle,
+        },
+        timeout=20,
+    )
+
+    if not respuesta.ok:
+        raise RuntimeError(
+            f"Brevo respondió con HTTP {respuesta.status_code}: "
+            f"{respuesta.text[:500]}"
+        )
+
+@app.route("/api/procesar", methods=["POST"])
+def procesar_catalogo():
+    clave_configurada = os.environ.get("PROCESS_API_KEY", "")
+    clave_recibida = request.headers.get("X-API-Key", "")
+
+    if (
+        not clave_configurada
+        or not clave_recibida
+        or not hmac.compare_digest(clave_recibida, clave_configurada)
+    ):
+        return jsonify({"message": "No autorizado"}), 401
+
+    datos = request.get_json(silent=True) or {}
+    destinatario = datos.get("email", "").strip()
+
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", destinatario):
+        return jsonify({"message": "Ingresa un correo válido"}), 400
+
+    conexion = None
+    cursor = None
+
+    try:
+        conexion = getConnection()
+        cursor = conexion.cursor()
+        cursor.execute(
+            "SELECT id, name, price, stock FROM products_vm"
+        )
+        productos = cursor.fetchall()
+
+        if not productos:
+            return jsonify({"message": "No hay productos para enviar"}), 404
+
+        filas_html = ""
+
+        for producto in productos:
+            nombre = html.escape(str(producto.name or "Sin nombre"))
+            precio = html.escape(f"{producto.price or 0:.2f}")
+            stock = html.escape(str(producto.stock or 0))
+
+            filas_html += (
+                f"<tr><td>{nombre}</td>"
+                f"<td>${precio}</td>"
+                f"<td>{stock} unidades</td></tr>"
+            )
+
+        contenido = f"""
+        <h2>Catálogo de productos</h2>
+        <p>Estos son los productos disponibles:</p>
+        <table border="1" cellpadding="8" cellspacing="0">
+            <thead>
+                <tr><th>Producto</th><th>Precio</th><th>Stock</th></tr>
+            </thead>
+            <tbody>{filas_html}</tbody>
+        </table>
+        """
+
+        enviar_correo(
+            "Catálogo de productos",
+            contenido,
+            destinatario,
+        )
+
+        return jsonify({"message": "Catálogo enviado correctamente"}), 200
+
+    except Exception as error:
+        app.logger.exception("Error al procesar y enviar el catálogo")
+        return jsonify({
+            "message": "No se pudo enviar el catálogo",
+            "error": str(error),
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
 
 @app.route('/test-db', methods=['GET'])
 def test_db():

@@ -164,12 +164,6 @@ def procesar_catalogo():
                             </ul>
 
                             <p style="margin:0 0 24px;">
-                                Los precios están expresados en dólares
-                                estadounidenses (USD). Los precios y las
-                                existencias pueden variar.
-                            </p>
-
-                            <p style="margin:0 0 24px;">
                                 Esperamos que esta información te sea útil.
                                 Gracias por consultar nuestro catálogo.
                             </p>
